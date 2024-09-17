@@ -7,119 +7,342 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const HomeScreen(),
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(primarySwatch: Colors.amber),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _HomeScreenState extends State<HomeScreen> {
+  List<Map<String, dynamic>> todoList = [];
+  String singlevalue = "";
+  bool showReleaseMessage = false;
+  bool showInputBox = false;
+  double dragOffset = 0.0;
+  final double dragThreshold = 100.0; // Threshold to show "Release" message
 
-  void _incrementCounter() {
+  // Importance levels
+  final List<String> importanceLevels = [
+    "lightwork",
+    "kinda important",
+    "mad important"
+  ];
+
+  String selectedImportance = "lightwork"; // Default importance level
+
+  // Function to update the text and importance of a task
+  void updateTask(int index, String updatedTask, String importance) {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      todoList[index]['value'] = updatedTask;
+      todoList[index]['importance'] = importance;
     });
   }
 
+  // Function to add new task
+  addList() {
+    if (singlevalue.isNotEmpty) {
+      setState(() {
+        todoList.add({"value": singlevalue, "importance": selectedImportance});
+        singlevalue = "";
+        selectedImportance = "lightwork"; // Reset after adding
+      });
+    }
+  }
+
+  // Function to delete task
+  deleteItem(index) {
+    setState(() {
+      todoList.removeAt(index);
+    });
+  }
+
+  // Function to show dialog for adding or editing a task
+  Future<void> _showTaskDialog({int? index}) async {
+    String taskValue = index != null ? todoList[index]['value'] : "";
+    String importance =
+        index != null ? todoList[index]['importance'] : "lightwork";
+    TextEditingController controller = TextEditingController(text: taskValue);
+
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(index == null ? "Add New Task" : "Edit Task"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: controller,
+                decoration: InputDecoration(
+                  labelText: index == null ? 'Enter task...' : 'Edit task...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              DropdownButtonFormField<String>(
+                value: importance,
+                items: importanceLevels
+                    .map((level) => DropdownMenuItem(
+                          value: level,
+                          child: Text(level),
+                        ))
+                    .toList(),
+                onChanged: (value) {
+                  importance = value!;
+                },
+                decoration: InputDecoration(
+                  labelText: "Select importance",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                if (controller.text.isNotEmpty) {
+                  if (index == null) {
+                    setState(() {
+                      todoList.add(
+                          {"value": controller.text, "importance": importance});
+                    });
+                  } else {
+                    updateTask(index, controller.text, importance);
+                  }
+                }
+                Navigator.of(context).pop();
+              },
+              child: Text(index == null ? "Add" : "Done"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+
+
+  // Handle the drag down gesture
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    setState(() {
+      dragOffset += details.primaryDelta!;
+      if (dragOffset > dragThreshold) {
+        showReleaseMessage = true;
+      } else {
+        showReleaseMessage = false;
+      }
+    });
+  }
+
+  // Handle the drag end gesture
+  void _onVerticalDragEnd(DragEndDetails details) {
+    if (showReleaseMessage) {
+      setState(() {
+        showInputBox = true;
+        dragOffset = dragThreshold; // Max drag limit
+      });
+    } else {
+      setState(() {
+        dragOffset = 0.0;
+        showInputBox = false;
+      });
+    }
+  }
+
+
+
+
+
+
+
+// build main header w/ drag functionality
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text(
+          "Shiity Todo Application",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 25,
+          ),
+        ),
+        centerTitle: true,
+        toolbarHeight: 75,
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () {},
+        ),
+        elevation: 0,
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+      body: GestureDetector(
+        onVerticalDragUpdate: _onVerticalDragUpdate,
+        onVerticalDragEnd: _onVerticalDragEnd,
+        child: Stack(
+          children: [
+            Transform.translate(
+              offset: Offset(0, dragOffset),
+              child: Column(
+                children: [
+                  Expanded(
+                    flex: 90,
+                    child: ListView.builder(
+                      itemCount: todoList.length,
+                      itemBuilder: (context, index) {
+                        return GestureDetector(
+                          onTap: () {
+                            _showTaskDialog(index: index);
+                          },
+                          child: Dismissible(
+                            key: Key(todoList[index]['value'].toString()),
+                            direction: DismissDirection.endToStart,
+                            onDismissed: (direction) {
+                              deleteItem(index);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("hell yeah brother")),
+                              );
+                            },
+                            background: Container(
+                              color: Colors.green,
+                              alignment: Alignment.centerRight,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: const Icon(
+                                Icons.check_circle,
+                                color: Colors.white,
+                              ),
+                            ),
+                            // creates actual list item card
+                            child: Card(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              color: Colors.white,
+                              child: SizedBox(
+                                height: 50,
+                                width: double.infinity,
+                                child: Container(
+                                  margin: const EdgeInsets.only(left: 20),
+                                  alignment: Alignment.center,
+                                  padding: const EdgeInsets.all(10),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 80,
+                                        child: Text(
+                                          todoList[index]['value'].toString(),
+                                          style: const TextStyle(
+                                            color: Colors.black,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      // adds the importance level to the right side of list item card
+                                      Text(
+                                        todoList[index]['importance'],
+                                        style: TextStyle(
+                                          color: todoList[index]
+                                                      ['importance'] ==
+                                                  "lightwork"
+                                              ? Colors.green
+                                              : todoList[index]['importance'] ==
+                                                      "kinda important"
+                                                  ? Colors.orange
+                                                  : Colors.red,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
+            // drag to add task
+            if (dragOffset > 0 && dragOffset < dragThreshold)
+              Positioned(
+                top: dragOffset - 50,
+                left: 0,
+                right: 0,
+                child: const Center(
+                  child: Text(
+                    "Pull down to add task",
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 19,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            if (dragOffset >= dragThreshold && !showInputBox)
+              Positioned(
+                top: dragOffset - 70,
+                left: 0,
+                right: 0,
+                child: const Center(
+                  child: Text(
+                    "Release!",
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+
+              // creates input box where you can write a new task
+            if (showInputBox)
+              Positioned(
+                top: dragOffset - 100,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: TextFormField(
+                    onChanged: (value) {
+                      singlevalue = value;
+                    },
+                    decoration: const InputDecoration(
+                      labelText: "new task",
+                    ),
+                    onFieldSubmitted: (value) {
+                      addList();
+                      setState(() {
+                        showInputBox = false;
+                        dragOffset = 0.0;
+                      });
+                    },
+                  ),
+                ),
+              ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
